@@ -18,7 +18,7 @@ public class DateTimeOffsetMethodCallTranslator
 
 #pragma warning disable EF1001 // Internal EF Core API usage.
     public SqlExpression? Translate(
-        SqlExpression instance,
+        SqlExpression? instance,
         MethodInfo method,
         IReadOnlyList<SqlExpression> arguments,
         IDiagnosticsLogger<DbLoggerCategory.Query> logger)
@@ -26,7 +26,7 @@ public class DateTimeOffsetMethodCallTranslator
             && (method.Name == nameof(DateTimeOffset.ToUniversalTime))
             && _sqlExpressionFactory is NpgsqlSqlExpressionFactory npgsqlSqlExpressionFactory)
             ? npgsqlSqlExpressionFactory.AtTimeZone(
-                instance,
+                instance!,
                 npgsqlSqlExpressionFactory.Constant("UTC"),
                 method.ReturnType)
             : null;

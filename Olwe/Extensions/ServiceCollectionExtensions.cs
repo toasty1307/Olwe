@@ -7,6 +7,7 @@ using Remora.Discord.API.Abstractions.Gateway.Commands;
 using Remora.Discord.Caching.Extensions;
 using Remora.Discord.Caching.Services;
 using Remora.Discord.Commands.Attributes;
+using Remora.Discord.Commands.Extensions;
 using Remora.Discord.Gateway;
 using Remora.Discord.Gateway.Extensions;
 using Remora.Discord.Gateway.Responders;
@@ -33,6 +34,7 @@ public static class ServiceCollectionExtensions
                     settings.SetDefaultSlidingExpiration(TimeSpan.FromMinutes(30));
                 }
             )
+            .AddDiscordCommands(true)
             .AddResponders(typeof(Setup).Assembly)
             .AddCommands(typeof(Setup).Assembly)
             .AddSlashCommands(typeof(Setup).Assembly);

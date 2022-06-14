@@ -5,7 +5,6 @@ using Olwe.Data.Extensions;
 using Olwe.Extensions;
 using Remora.Discord.Hosting.Extensions;
 using Serilog;
-using Serilog.Events;
 using Serilog.Templates;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,12 +30,11 @@ builder.Services.AddControllersWithViews();
 builder.Host.UseSerilog((_, configuration) =>
 {
     configuration
-        .MinimumLevel.Verbose()
-        .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+        .MinimumLevel.Information()
         .Enrich.FromLogContext()
         .WriteTo.Console(formatter: new ExpressionTemplate(consoleLogFormat, theme: LoggerTheme.Theme))
         .WriteTo.Map(
-            e => $"{DateOnly.FromDateTime(DateTimeOffset.UtcNow.DateTime):yyyy-MM-dd}",
+            _ => $"{DateOnly.FromDateTime(DateTimeOffset.UtcNow.DateTime):yyyy-MM-dd}",
             (v, cf) =>
             {
                 cf.File(
@@ -77,6 +75,7 @@ await using var db = app.Services.CreateScope()
     .ServiceProvider
     .GetRequiredService<OlweContext>();
 
+try { db.Database.GetPendingMigrations();} catch { /* for some reason the first call to this throws an error */ }
 var pendingMigrations = db.Database.GetPendingMigrations();
 if (pendingMigrations.Any())
     await db.Database.MigrateAsync();
