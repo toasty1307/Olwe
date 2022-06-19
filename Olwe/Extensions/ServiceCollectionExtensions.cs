@@ -1,6 +1,8 @@
 ﻿using System.Reflection;
 using Olwe.Remora;
 using Olwe.Remora.Attributes;
+using Olwe.Remora.Parsers;
+using Olwe.Remora.PostExecutionEvents;
 using Remora.Commands.Extensions;
 using Remora.Commands.Groups;
 using Remora.Discord.API.Abstractions.Gateway.Commands;
@@ -8,9 +10,13 @@ using Remora.Discord.Caching.Extensions;
 using Remora.Discord.Caching.Services;
 using Remora.Discord.Commands.Attributes;
 using Remora.Discord.Commands.Extensions;
+using Remora.Discord.Commands.Services;
 using Remora.Discord.Gateway;
 using Remora.Discord.Gateway.Extensions;
 using Remora.Discord.Gateway.Responders;
+using Remora.Discord.Rest.Extensions;
+using Remora.Extensions.Options.Immutable;
+using VTP.AntiPhishingGateway;
 
 namespace Olwe.Extensions;
 
@@ -27,18 +33,27 @@ public static class ServiceCollectionExtensions
                 GatewayIntents.DirectMessageReactions |
                 GatewayIntents.MessageContents
             )
-            .AddDiscordCaching()
             .Configure<CacheSettings>(settings =>
                 {
                     settings.SetDefaultAbsoluteExpiration(TimeSpan.FromHours(2));
                     settings.SetDefaultSlidingExpiration(TimeSpan.FromMinutes(30));
                 }
             )
+            .AddDiscordCaching()
             .AddDiscordCommands(true)
             .AddResponders(typeof(Setup).Assembly)
             .AddCommands(typeof(Setup).Assembly)
-            .AddSlashCommands(typeof(Setup).Assembly);
-    
+            .AddSlashCommands(typeof(Setup).Assembly)
+            .AddDiscordRest(provider => provider.GetRequiredService<IConfiguration>()["Olwe:Discord:Token"] ??
+                                        throw new InvalidOperationException("Olwe:Discord:Token is not configured"))
+            .AddParser<EmojiParser>()
+            .AddScoped<ICommandPrefixMatcher, PrefixMatcher>()
+            .AddPostExecutionEvent<CommandExecuted>()
+            .Configure<PhishingDetectionOptions>(options => options with {FollowShortners = true})
+            .Configure<PhishingServiceOptions>(options => options with {TerminateOnError = false})
+            .AddAntiPhishing()
+            .AddPhishingService();
+
     public static IServiceCollection AddResponders(this IServiceCollection services, Assembly assembly)
     {
         var types = assembly
@@ -48,13 +63,13 @@ public static class ServiceCollectionExtensions
         foreach (var type in types)
         {
             var responderGroup = type.GetCustomAttribute<ResponderGroupAttribute>()?.Group ?? ResponderGroup.Normal;
-           
+
             services.AddResponder(type, responderGroup);
         }
 
         return services;
     }
-    
+
     public static IServiceCollection AddCommands(this IServiceCollection services, Assembly assembly)
     {
         var types = assembly
@@ -62,13 +77,13 @@ public static class ServiceCollectionExtensions
             .Where(t => t.IsClass && !t.IsNested && !t.IsAbstract && t.IsAssignableTo(typeof(CommandGroup)));
 
         var tree = services.AddCommandTree();
-        
+
         foreach (var type in types)
             tree.WithCommandGroup(type);
-        
+
         return tree.Finish();
     }
-    
+
     public static IServiceCollection AddSlashCommands(this IServiceCollection services, Assembly assembly)
     {
         var types = assembly
@@ -76,10 +91,10 @@ public static class ServiceCollectionExtensions
             .Where(t => t.IsClass && !t.IsNested && !t.IsAbstract && t.IsAssignableTo(typeof(CommandGroup)));
 
         var tree = services.AddCommandTree("olwe_slash_tree");
-        
+
         foreach (var type in types.Where(t => t.GetCustomAttribute<ExcludeFromSlashCommandsAttribute>() is null))
             tree.WithCommandGroup(type);
-        
+
         return tree.Finish();
     }
 }
